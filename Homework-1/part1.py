@@ -3,6 +3,7 @@ import os
 import cv2
 import moviepy.editor as mpy
 
+
 background = cv2.imread("Malibu.jpg")
 #cv2.imshow("Background Image Window", background)
 #cv2.waitKey(0)
