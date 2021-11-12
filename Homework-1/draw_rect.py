@@ -23,7 +23,7 @@ images_list = []
 
 for i in range(472):
 	blank_image = np.zeros((322,572,3), np.uint8)
-
+	blank_image.fill(255)
 	for j in range(9):
 
 			pts = planes[j,i,:,:].squeeze()[:,0:2].astype(np.int32)
@@ -34,11 +34,11 @@ for i in range(472):
 
 			pts = pts.reshape((-1, 1, 2))
 
-			cv2.polylines(blank_image, [pts], True, (0, 255, 255))
+			cv2.fillPoly(blank_image, [pts], (0, j*20, 255-(j*20)))
 
 	images_list.append(blank_image)
 
 
 clip = moviepy.ImageSequenceClip(images_list, fps = 25)
-clip.write_videofile("part1_vid.mp4", codec="libx264")
+clip.write_videofile("part3_TEST_vid.mp4", codec="libx264")
 

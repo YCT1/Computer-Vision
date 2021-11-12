@@ -4,6 +4,7 @@ import cv2
 import moviepy.editor as mpy
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from numpy.ma import masked
 
 
 # This function reads the planes file and returns result as matrix
@@ -42,17 +43,15 @@ def changeOrder(array):
     pts1[2] = pts1temp[3]
     return pts1
 
-planes = readAllPlanes(9)
 
-video_length = planes.shape[1]
 
-def maskedAdding(background, source):
+def maskedAdding(background, source,x=0,y=0):
     rows,cols,channels = source.shape
     roi = background[0:rows, 0:cols ]
 
     # Now create a mask of logo and create its inverse mask also
     img2gray = cv2.cvtColor(source,cv2.COLOR_BGR2GRAY)
-    ret, mask = cv2.threshold(img2gray, 10, 255, cv2.THRESH_BINARY)
+    ret, mask = cv2.threshold(img2gray, 5, 255, cv2.THRESH_BINARY)
     mask_inv = cv2.bitwise_not(mask)
 
     # Now black-out the area of logo in ROI
@@ -63,28 +62,53 @@ def maskedAdding(background, source):
 
     # Put logo in ROI and modify the main image
     dst = cv2.add(img1_bg.astype(np.float32),img2_fg.astype(np.float32))
-    background[0:rows, 0:cols ] = dst
+    background[x:rows+x, y:cols+y ] = dst
     return background
-"""
+
+
+# Perspective Matrix Calculator
+def findPerspectiveMatrix(x = np.zeros([4,2]), u = np.zeros([4,2])):
+    c = np.zeros([3,3])
+    c[2][2] = 1
+    x = x.T
+    u = u.T
+
+    # Holy Matrix
+
+    A = np.array([
+        [x[0][0], x[1][0], 1, 0, 0, 0, -x[0][0]*u[0][0], -x[1][0]*u[0][0]],
+        [x[0][1], x[1][1], 1, 0, 0, 0, -x[0][1]*u[0][1], -x[1][1]*u[0][1]],
+        [x[0][2], x[1][2], 1, 0, 0, 0, -x[0][2]*u[0][2], -x[1][2]*u[0][2]],
+        [x[0][3], x[1][3], 1, 0, 0, 0, -x[0][3]*u[0][3], -x[1][3]*u[0][3]],
+        [0, 0, 0, x[0][0], x[1][0], 1, -x[0][0]*u[1][0], -x[1][0]*u[1][0]],
+        [0, 0, 0, x[0][1], x[1][1], 1, -x[0][1]*u[1][1], -x[1][1]*u[1][1]],
+        [0, 0, 0, x[0][2], x[1][2], 1, -x[0][2]*u[1][2], -x[1][2]*u[1][2]],
+        [0, 0, 0, x[0][3], x[1][3], 1, -x[0][3]*u[1][3], -x[1][3]*u[1][3]],
+    ])
+    
+    b= np.array([u.flatten()])
+    return np.append(np.linalg.pinv(A) @ b.T,1).reshape(3,3)
+
+
+def sortPlane(plane):
+        return plane[1]
+
+def planeOrder(planesMatrix,planes):
+    
+    for i in range(0,len(planes)):
+        planes[i] = [planes[i],planesMatrix[i]]
+
+    planes.sort(key=sortPlane,reverse=True)
+    for i in range(0, len(planes)):
+        planes[i] = planes[i][0]
+
+    return planes
+    
+    
+
 frame_list = []
-album = cv2.imread("albums/album.png")
-album2 = cv2.imread("albums/album2.png")
-pts2 = np.float32([[0, 0], [256, 0], [0, 256], [256, 256]])
-for i in range(0,video_length):
-    matrix1 = cv2.getPerspectiveTransform(changeOrder(planes[0][i]).astype(np.float32), pts2.astype(np.float32))
-    matrix1 = np.linalg.inv(matrix1)
-
-    matrix2 = cv2.getPerspectiveTransform(changeOrder(planes[1][i]).astype(np.float32), pts2.astype(np.float32))
-    matrix2 = np.linalg.inv(matrix2)
-
-    result = cv2.warpPerspective(album, matrix1, (572, 322))[:,:,[2,1,0]]
-    resutl2 = cv2.warpPerspective(album2, matrix2,(572, 322))[:,:,[2,1,0]]
-    r= cv2.add(result,resutl2)
-    frame_list.append(r)
-
-"""
-
-frame_list = []
+planes = readAllPlanes(9)
+video_length = planes.shape[1]
 # Generilization
 albumlist =[
     "albums/album.png",
@@ -97,44 +121,29 @@ albumlist =[
     "albums/album2.png",
     "albums/album3.png"
 ]
-"""
+
+
 size_of_albums = np.float32([[0, 0], [256, 0], [0, 256], [256, 256]])
+cat = cv2.imread("cat-headphones.png")[:,:,[2,1,0]]
+cat = cv2.resize(cat,[326,322])
 for i in range(0,video_length):
     background = np.zeros([322,572,3])
     background.fill(255)
+    background = maskedAdding(background,cat,y=125)
     frame = []
     for name_of_album_i in range(0,len(albumlist)):
         album = cv2.imread(albumlist[name_of_album_i])
-        matrix = cv2.getPerspectiveTransform(changeOrder(planes[name_of_album_i][i]).astype(np.float32), size_of_albums.astype(np.float32))
+        matrix = findPerspectiveMatrix(changeOrder(planes[name_of_album_i][i]).astype(np.float32), size_of_albums.astype(np.float32))
         matrix = np.linalg.inv(matrix)
         result = cv2.warpPerspective(album, matrix, (572, 322))[:,:,[2,1,0]]
         frame.append(result)
     
-    background = cv2.add(background.astype(np.float32),frame[0].astype(np.float32))
-    
-    for i in range(1,len(frame)):
-        background = cv2.add(frame[i].astype(np.float32),background.astype(np.float32))
-    frame_list.append(background)
+    depthPlaneMatrix = np.zeros([9])
+    for k in range(0,planes.shape[0]):
+        depthPlaneMatrix[k] = np.mean(planes[k][i].T[:3].T)
 
-
-clip = mpy.ImageSequenceClip(frame_list,fps=25)
-clip.write_videofile("part3_video.mp4", codec="libx264")
-"""
-
-size_of_albums = np.float32([[0, 0], [256, 0], [0, 256], [256, 256]])
-for i in range(0,video_length):
-    background = np.zeros([322,572,3])
-    background.fill(255)
-    frame = []
-    for name_of_album_i in range(0,len(albumlist)):
-        album = cv2.imread(albumlist[name_of_album_i])
-        matrix = cv2.getPerspectiveTransform(changeOrder(planes[name_of_album_i][i]).astype(np.float32), size_of_albums.astype(np.float32))
-        matrix = np.linalg.inv(matrix)
-        result = cv2.warpPerspective(album, matrix, (572, 322))[:,:,[2,1,0]]
-        frame.append(result)
-    
-    
-    
+       
+    frame = planeOrder(depthPlaneMatrix, frame)
     for i in range(0,len(frame)):
         background = maskedAdding(background,frame[i])
 
