@@ -1,5 +1,5 @@
-# Yekta Can Tursun
-# 150170105
+# Yekta Can Tursun #
+# 150170105 #
 
 import moviepy.video.io.VideoFileClip as mpy
 import moviepy.editor as mpyeditor
