@@ -122,11 +122,11 @@ albumlist =[
     "albums/album2.png",
     "albums/album3.png",
     "albums/album4.png",
-    "albums/album.png",
+    "albums/album5.png",
     "albums/album2.png",
     "albums/album3.png",
     "albums/album4.png",
-    "albums/album.png"
+    "albums/album5.png"
 ]
 
 # Size of the albums should be defined in clock wise order
